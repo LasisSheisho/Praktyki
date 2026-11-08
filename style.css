@@ -1,0 +1,72 @@
+:root {
+  --bg: #0c0c0c;
+  --panel: #2fd637;
+  --text: white;
+  --border: #1a5fce;
+}
+
+html, body {
+  margin: 0;
+  min-height: 100%;
+  background: green;
+  color: var(--text);
+  font-family: Helvetica;
+}
+
+.start {
+  max-width: 1100px;
+  margin:auto;
+  padding: 48px 20px 60px;
+  text-align: center;
+}
+
+.start h1 {
+  font-size: 40px;
+}
+
+h2.section {
+  font-size: 20px;
+  color: white;
+  text-transform: uppercase;
+ 
+}
+
+.maps {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 20px;
+  }
+
+.map-card {
+  appearance: none;
+  background: rgb(29, 199, 29);
+  border: 2px;
+  border-radius: 14px;
+  padding: 14px;
+  color: white;
+  font: Helvetica;
+  text-align: center;
+}
+.map-card:hover { transform: translateY(-3px); }
+
+
+.preview {
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  display: block;
+  border-radius: 8px;
+  image-rendering: pixelated;
+  background: #000;
+}
+
+.actions { margin-top: 32px; }
+
+.btn {
+  border: 0;
+  border-radius: 10px;
+  padding: 14px 36px;
+  font: Helvetica;
+  font-size: 30px;
+  font-weight: 700;
+  color: #000000;
+}
