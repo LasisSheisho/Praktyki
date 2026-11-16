@@ -11,7 +11,13 @@
 
   <script src="start-screen.js"></script>
   <script>
-    StartScreen.create(document.getElementById('app'),{});
-  </script>
+  StartScreen.create(document.getElementById('app'), {
+    onStart: function (game) {
+      window.location.href = 'game.html?map=' + encodeURIComponent(game.mapId);
+    }
+  });
+</script>
+  
+  
 </body>
 </html>
