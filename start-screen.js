@@ -9,19 +9,16 @@
     {
       id: 'jeziora',
       name: 'Kraina Jezior',
-      description: 'Kilka jezior rozsianych po okolicy.',
       image: '33.png',
     },
     {
       id: 'rzeka',
       name: 'Dolina Rzeki',
-      description: 'Kręta rzeka przecina mapę z północy na południe.',
       image: '22.png',
     },
     {
       id: 'wybrzeze',
       name: 'Wybrzeże',
-      description: 'Morze wzdłuż zachodniej krawędzi mapy.',
       image: '11.png',
     },
   ];
@@ -57,7 +54,6 @@
       card.innerHTML = `
         <img class="preview" alt="Podgląd mapy ${def.name}" src="${def.image}">
         <h3>${def.name}</h3>
-        <p>${def.description}</p>
       `;
 
       const img = card.querySelector('img');
