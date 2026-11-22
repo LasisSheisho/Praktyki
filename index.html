@@ -31,20 +31,29 @@
 
 <div id="main">
   <canvas id="map"></canvas>
+
+  <div class="panel">
+    <h3>Budynki</h3>
+    <div id="tools"></div>
+  </div>
 </div>
 
 <script>
-const N = 32, S = 20;
+const N = 32, S = 20;                       
 const TN = ['grass', 'darkgrass', 'swamp', 'water', 'sand'];   
-const TC = ['#7c5', '#385', '#675', '#37a', '#ec8'];
+const TC = ['#7c5', '#385', '#675', '#37a', '#ec8'];          
 
 
-const TIERS = {};
+const TIERS = {
+  house: { col: '#c55', list: [['Domek', 1, 1, 100, 4], ['Dom', 2, 2, 400, 20], ['Blok', 2, 3, 1500, 80], ['Wieżowiec', 3, 4, 6000, 400]] },
+  work:  { col: '#58c', list: [['Warsztat', 1, 1, 150, 4], ['Sklep', 2, 2, 500, 20], ['Fabryka', 3, 3, 2000, 80], ['Biurowiec', 3, 4, 8000, 400]] }
+};
 const B = { road: { cat: 'road', n: 'Droga', w: 1, h: 1, c: 10, col: '#555' } };
 Object.keys(TIERS).forEach(cat => TIERS[cat].list.forEach((a, i) => {
   B[cat + (i + 1)] = { cat, n: a[0], w: a[1], h: a[2], c: a[3], v: a[4], col: TIERS[cat].col };
 }));
 
+// ---------- mapa ----------
 //ai
 function terr(x, y) {
   const d = (a, b, r) => (x - a) ** 2 + (y - b) ** 2 < r * r;
@@ -52,7 +61,7 @@ function terr(x, y) {
   if (wat(x, y)) return 3;
   let near = false;
   for (let dy = -2; dy <= 2; dy++) for (let dx = -2; dx <= 2; dx++) if (wat(x + dx, y + dy)) near = true;
-  if (near && ((y >= 8 && x >= 18) || x <= 5)) return 4;
+  if (near && ((y >= 8 && x >= 18) || x <= 5)) return 4;   // piasek tylko na części brzegów
   if (d(12, 12, 3) || d(26, 22, 3.5) || d(4, 8, 2.5)) return 2;
   if (d(14, 22, 4) || d(10, 4, 3) || d(28, 28, 3)) return 1;
   return 0;
@@ -61,7 +70,7 @@ function terr(x, y) {
 const MAP = [];
 for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) MAP[y * N + x] = terr(x, y);
 
-
+// ---------- stan gry ----------
 let blds = [], money = 1000, tool = 'road', user = null, hover = null;
 const cv = document.getElementById('map');
 cv.width = cv.height = N * S;
@@ -81,24 +90,31 @@ function occ() {
 }
 
 function canPlace(t, x, y) {
-  return tiles(t, x, y).every(([a, b]) => inMap(a, b));
+  const o = occ(), ts = tiles(t, x, y);
+  for (const [a, b] of ts) {
+    if (!inMap(a, b) || MAP[b * N + a] == 3 || o[b * N + a] >= 0) return false;
+  }
+  if (B[t].cat == 'pump') {   
+    return ts.some(([a, b]) => [[1, 0], [-1, 0], [0, 1], [0, -1]].some(([dx, dy]) =>
+      inMap(a + dx, b + dy) && MAP[(b + dy) * N + a + dx] == 3));
+  }
+  return true;
 }
 
-
+// ---------- rysowanie ----------
 function pic(n, x, y, w, h, col) {
   ctx.fillStyle = col;
   ctx.fillRect(x * S, y * S, w * S, h * S);
 }
 
-const LETTER = { house: 'D', work: 'P', pump: 'W', power: 'E' };
+const LETTER = { house: 'D', work: 'P', pump: 'W', power: 'E' };   // D dom, P praca, W woda, E prąd (+ numer poziomu)
 
 function draw() {
   for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
     const k = MAP[y * N + x];
     pic(TN[k], x, y, 1, 1, TC[k]);
   }
-
-  //ai
+   //ai
   blds.forEach(b => {
     pic(b.t, b.x, b.y, B[b.t].w, B[b.t].h, B[b.t].col);
     ctx.strokeStyle = '#000';
@@ -118,7 +134,60 @@ function draw() {
   }
 }
 
-draw();
+function ui() {
+  draw();
+}
+//ai
+// ---------- panel budynków ----------
+const tl = document.getElementById('tools');
+const heads = { road: 'Drogi', house: 'Domy', work: 'Praca ', pump: 'Woda', power: 'Prąd' };
+const unit = { house: 'os.', work: 'prac.', pump: 'wody', power: 'prądu' };
+let lastCat = '';
+Object.keys(B).concat('bulldoze').forEach(t => {
+  const cat = t == 'bulldoze' ? 'bulldoze' : B[t].cat;
+  if (cat != lastCat) {
+    lastCat = cat;
+    if (heads[cat]) {
+      const h = document.createElement('div');
+      h.textContent = heads[cat];
+      h.style.cssText = 'margin:8px 0 3px;color:#fc3;font-weight:bold';
+      tl.appendChild(h);
+    }
+  }
+  const b = document.createElement('button');
+  b.className = 'tool'; b.id = 't_' + t;
+  const name = t == 'bulldoze' ? 'Usuń' : B[t].n;
+  const info = t == 'bulldoze' ? '' : ` ${B[t].w}x${B[t].h} - $${B[t].c}` + (B[t].v ? ` - ${B[t].v} ${unit[B[t].cat]}` : '');
+  const col = t == 'bulldoze' ? '#a33' : B[t].col;
+  b.innerHTML = `<span style="width:18px;height:18px;flex:none;background:${col};border:1px solid #000"></span><span>${name}<br><small>${info}</small></span>`;
+  b.onclick = () => {
+    tool = t;
+    document.querySelectorAll('.tool').forEach(e => e.classList.remove('sel'));
+    b.classList.add('sel');
+  };
+  tl.appendChild(b);
+});
+document.getElementById('t_road').classList.add('sel');
+//koniec ai
+// ---------- mysz ----------
+const pos = e => {
+  const r = cv.getBoundingClientRect();
+  return [Math.floor((e.clientX - r.left) * cv.width / r.width / S), Math.floor((e.clientY - r.top) * cv.height / r.height / S)];
+};
+cv.onmousemove = e => { hover = pos(e); draw(); };
+cv.onmouseleave = () => { hover = null; draw(); };
+cv.onclick = e => {
+  const [x, y] = pos(e);
+  if (tool == 'bulldoze') {
+    const i = occ()[y * N + x];
+    if (i >= 0) blds.splice(i, 1);
+  } else if (canPlace(tool, x, y)) {
+    blds.push({ t: tool, x, y });
+  } else return;
+  ui();
+};
+
+ui();
 </script>
 </body>
 </html>
