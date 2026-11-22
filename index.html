@@ -1,35 +1,42 @@
 <!DOCTYPE html>
+
 <html lang="pl">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>CityGrid</title>
-  <link rel="stylesheet" href="style.css">
+<meta charset="utf-8">
+<title>CityGrid</title>
+<style>
+  
+  body { margin: 0; font-family: Arial, sans-serif; background: #222; color: #fff; }
+  #top { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; background: #111; padding: 8px 16px; }
+  #top h1 { margin: 0; }
+  #auth { text-align: right; }
+  #auth input { width: 90px; }
+  #msg { color: #f88; font-size: 12px; height: 14px; }
+  #main { display: flex; justify-content: center; gap: 12px; padding: 12px; }
+  .panel { background: #333; padding: 10px; width: 220px; height: fit-content; }
+  .panel h3 { margin: 0 0 8px; }
+  .panel ol { padding-left: 20px; margin: 0; }
+  canvas { background: #000; cursor: crosshair; display: block; flex: none; }
+  .tool { display: flex; align-items: center; gap: 6px; width: 100%; margin-bottom: 4px; padding: 4px; cursor: pointer; text-align: left; }
+  .tool img { width: 28px; height: 28px; }
+  .tool.sel { background: #fc3; }
+  #stats { margin-top: 10px; font-size: 14px; line-height: 1.6; }
+  #info { font-size: 12px; color: #aaa; margin-top: 10px; }
+</style>
 </head>
 <body>
-<header>
-      <p>CityGrid</p>
-</header>
 
-  <main>
-    <h2 class="opis">Wybierz mapę</h2>
-    <div class="karty">
-    <div class="karta">
-      <a href="strona1.html"><img src="img1.png" alt="img1"></a>
-      <p>Kraina Jezior</p>
-    </div>
+<div id="top">
+  <center>
+  <h1>CityGrid</h1></center>
+  <div id="auth"></div>
+</div>
 
-    <div class="karta">
-      <a href="strona2.html"><img src="img2.png" alt="img2"></a>
-      <p>Dolina Rzeki</p>
-    </div>
+<div id="main">
+  <canvas id="map"></canvas>
+</div>
 
-    <div class="karta">
-      <a href="strona3.html"><img src="img3.png" alt="img3"></a>
-      <p>Wybrzeże</p>
-    </div>
-    </div>
-  </main>
 
+</script>
 </body>
 </html>
