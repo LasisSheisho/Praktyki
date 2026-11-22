@@ -35,7 +35,17 @@
 <div id="main">
   <canvas id="map"></canvas>
 </div>
-
+<script>
+const N = 32, S = 20;                 
+const cv = document.getElementById('map');
+cv.width = cv.height = N * S;
+const ctx = cv.getContext('2d');
+for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
+  ctx.fillStyle = '#7c5';
+  ctx.fillRect(x * S, y * S, S, S);
+  ctx.strokeStyle = 'rgba(0,0,0,.15)';
+  ctx.strokeRect(x * S, y * S, S, S);
+}
 
 </script>
 </body>
