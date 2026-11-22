@@ -2,22 +2,34 @@
 <html lang="pl">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>CityGrid</title>
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <div id="app"></div>
+<header>
+      <p>CityGrid</p>
+</header>
 
-  <script src="start-screen.js"></script>
-  <script>
-  StartScreen.create(document.getElementById('app'), {
-    onStart: function (game) {
-      window.location.href = 'game.html?map=' + encodeURIComponent(game.mapId);
-    }
-  });
-</script>
-  
-  
+  <main>
+    <h2 class="opis">Wybierz mapę</h2>
+    <div class="karty">
+    <div class="karta">
+      <a href="strona1.html"><img src="img1.png" alt="img1"></a>
+      <p>Kraina Jezior</p>
+    </div>
+
+    <div class="karta">
+      <a href="strona2.html"><img src="img2.png" alt="img2"></a>
+      <p>Dolina Rzeki</p>
+    </div>
+
+    <div class="karta">
+      <a href="strona3.html"><img src="img3.png" alt="img3"></a>
+      <p>Wybrzeże</p>
+    </div>
+    </div>
+  </main>
+
 </body>
 </html>
