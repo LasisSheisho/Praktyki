@@ -25,11 +25,25 @@
 <body>
 
 <div id="top">
+  <div></div>
   <h1>CityGrid</h1>
-  <div id="auth"></div>
+  <div id="auth">
+    <span id="guest">
+      <input id="u" placeholder="Nick"> <input id="p" type="password" placeholder="Hasło">
+      <button onclick="auth('login')">Zaloguj</button>
+      <button onclick="auth('register')">Rejestracja</button>
+    </span>
+    <span id="logged" hidden><b id="name"></b> <button onclick="logout()">Wyloguj</button></span>
+    <div id="msg"></div>
+  </div>
 </div>
 
 <div id="main">
+  <div class="panel">
+    <h3>Leaderboard</h3>
+    <ol id="lb"></ol>
+  </div>
+
   <canvas id="map"></canvas>
 
   <div class="panel">
@@ -101,7 +115,7 @@ function canPlace(t, x, y) {
   for (const [a, b] of ts) {
     if (!inMap(a, b) || MAP[b * N + a] == 3 || o[b * N + a] >= 0) return false;
   }
-  if (B[t].cat == 'pump') {
+  if (B[t].cat == 'pump') {   // musi stać obok wody
     return ts.some(([a, b]) => [[1, 0], [-1, 0], [0, 1], [0, -1]].some(([dx, dy]) =>
       inMap(a + dx, b + dy) && MAP[(b + dy) * N + a + dx] == 3));
   }
@@ -137,7 +151,7 @@ function calc() {
       people += v; demand += d.v / 4;
       grp().people += v;
     } else if (d.cat == 'work') {
-      const m = (has(b, 2) ? 0.9 : 1) * (has(b, 1) ? 1.1 : 1);
+      const m = (has(b, 2) ? 0.9 : 1) * (has(b, 1) ? 1.1 : 1); 
       jobs += d.v; demand += d.v / 4;
       const g = grp();
       g.jobs += d.v; g.w.push([d.v, m]);
@@ -198,7 +212,7 @@ function ui() {
 //ai
 // ---------- panel budynków ----------
 const tl = document.getElementById('tools');
-const heads = { road: 'Drogi', house: 'Domy', work: 'Praca', pump: 'Woda', power: 'Prąd' };
+const heads = { road: 'Drogi', house: 'Domy (ludzie)', work: 'Praca (miejsca)', pump: 'Woda', power: 'Prąd' };
 const unit = { house: 'os.', work: 'prac.', pump: 'wody', power: 'prądu' };
 let lastCat = '';
 Object.keys(B).concat('bulldoze').forEach(t => {
@@ -214,7 +228,7 @@ Object.keys(B).concat('bulldoze').forEach(t => {
   }
   const b = document.createElement('button');
   b.className = 'tool'; b.id = 't_' + t;
-  const name = t == 'bulldoze' ? 'Usuń' : B[t].n;
+  const name = t == 'bulldoze' ? 'Burz' : B[t].n;
   const info = t == 'bulldoze' ? '' : ` ${B[t].w}x${B[t].h} - $${B[t].c}` + (B[t].v ? ` - ${B[t].v} ${unit[B[t].cat]}` : '');
   const col = t == 'bulldoze' ? '#a33' : B[t].col;
   b.innerHTML = `<span style="width:18px;height:18px;flex:none;background:${col};border:1px solid #000"></span><span>${name}<br><small>${info}</small></span>`;
@@ -243,11 +257,59 @@ cv.onclick = e => {
     blds.push({ t: tool, x, y });
     money -= B[tool].c;
   } else return;
-  ui();
+  ui(); save();
 };
 
+// ---------- API / login ----------
+const api = (a, d) => fetch('api.php?action=' + a, { method: 'POST', body: JSON.stringify(d || {}) }).then(r => r.json());
+const msg = t => document.getElementById('msg').textContent = t || '';
+
+function setUser(r) {
+  user = r.username;
+  money = Number(r.money);
+  blds = JSON.parse(r.city || '[]').filter(b => B[b.t]);
+  document.getElementById('guest').hidden = true;
+  document.getElementById('logged').hidden = false;
+  document.getElementById('name').textContent = user;
+  msg(); ui();
+}
+
+function auth(a) {
+  api(a, { username: document.getElementById('u').value, password: document.getElementById('p').value })
+    .then(r => r.error ? msg(r.error) : (setUser(r), lb()));
+}
+
+function logout() {
+  save();
+  api('logout').then(() => {
+    user = null; money = 1000; blds = [];
+    document.getElementById('guest').hidden = false;
+    document.getElementById('logged').hidden = true;
+    ui();
+  });
+}
+
+function save() {
+  if (user) api('save', { money, city: JSON.stringify(blds) });
+}
+
+function lb() {
+  api('leaderboard').then(r => {
+    const ol = document.getElementById('lb');
+    ol.innerHTML = '';
+    (Array.isArray(r) ? r : []).forEach(u => {
+      const li = document.createElement('li');
+      li.textContent = `${u.username} - $${u.money}`;
+      ol.appendChild(li);
+    });
+  });
+}
+
 // ---------- start ----------
-setInterval(() => { money += Math.round(calc().income); ui(); }, 3000);
+setInterval(() => { money += Math.round(calc().income); ui(); save(); }, 3000);
+setInterval(lb, 5000);
+api('me').then(r => { if (r.username) setUser(r); });
+lb();
 ui();
 </script>
 </body>
