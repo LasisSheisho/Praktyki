@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+
 <html lang="pl">
 <head>
 <meta charset="utf-8">
@@ -35,17 +36,19 @@
   <div class="panel">
     <h3>Budynki</h3>
     <div id="tools"></div>
+    <div id="stats"></div>
   </div>
 </div>
 
 <script>
 const N = 32, S = 20;                       
-const TN = ['grass', 'darkgrass', 'swamp', 'water', 'sand'];   
-const TC = ['#7c5', '#385', '#675', '#37a', '#ec8'];          
+const TN = ['grass', 'darkgrass', 'swamp', 'water', 'sand']; 
+const TC = ['#7c5', '#385', '#675', '#37a', '#ec8']; 
+
 
 
 const TIERS = {
-  house: { col: '#c55', list: [['Domek', 1, 1, 100, 4], ['Dom', 2, 2, 400, 20], ['Blok', 2, 3, 1500, 80], ['Wieżowiec', 3, 4, 6000, 400]] },
+  house: { col: '#c55', list: [['Dom', 1, 1, 100, 4], ['Wielorodzinny Dom', 2, 2, 400, 20], ['Blok', 2, 3, 1500, 80], ['Wieżowiec', 3, 4, 6000, 400]] },
   work:  { col: '#58c', list: [['Warsztat', 1, 1, 150, 4], ['Sklep', 2, 2, 500, 20], ['Fabryka', 3, 3, 2000, 80], ['Biurowiec', 3, 4, 8000, 400]] }
 };
 const B = { road: { cat: 'road', n: 'Droga', w: 1, h: 1, c: 10, col: '#555' } };
@@ -53,7 +56,7 @@ Object.keys(TIERS).forEach(cat => TIERS[cat].list.forEach((a, i) => {
   B[cat + (i + 1)] = { cat, n: a[0], w: a[1], h: a[2], c: a[3], v: a[4], col: TIERS[cat].col };
 }));
 
-// ---------- mapa ----------
+// ---------- stała mapa ----------
 //ai
 function terr(x, y) {
   const d = (a, b, r) => (x - a) ** 2 + (y - b) ** 2 < r * r;
@@ -66,9 +69,9 @@ function terr(x, y) {
   if (d(14, 22, 4) || d(10, 4, 3) || d(28, 28, 3)) return 1;
   return 0;
 }
-//koniec ai
 const MAP = [];
 for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) MAP[y * N + x] = terr(x, y);
+//loniec ai
 
 // ---------- stan gry ----------
 let blds = [], money = 1000, tool = 'road', user = null, hover = null;
@@ -90,15 +93,65 @@ function occ() {
 }
 
 function canPlace(t, x, y) {
+  if (money < B[t].c) return false;
   const o = occ(), ts = tiles(t, x, y);
   for (const [a, b] of ts) {
     if (!inMap(a, b) || MAP[b * N + a] == 3 || o[b * N + a] >= 0) return false;
   }
-  if (B[t].cat == 'pump') {   
+  if (B[t].cat == 'pump') {   // musi stać obok wody
     return ts.some(([a, b]) => [[1, 0], [-1, 0], [0, 1], [0, -1]].some(([dx, dy]) =>
       inMap(a + dx, b + dy) && MAP[(b + dy) * N + a + dx] == 3));
   }
   return true;
+}
+
+// ---------- obliczenia ----------
+function calc() {
+  const o = occ(), p = [...Array(N * N + blds.length).keys()];
+  const f = a => p[a] == a ? a : (p[a] = f(p[a]));
+  const uni = (a, b) => { p[f(a)] = f(b); };
+  const isRoad = (x, y) => inMap(x, y) && o[y * N + x] >= 0 && blds[o[y * N + x]].t == 'road';
+
+  blds.forEach((b, i) => {
+    if (b.t == 'road') {
+      [[1, 0], [0, 1]].forEach(([dx, dy]) => { if (isRoad(b.x + dx, b.y + dy)) uni(b.y * N + b.x, (b.y + dy) * N + b.x + dx); });
+    } else if (B[b.t].cat == 'house' || B[b.t].cat == 'work') {
+      tiles(b.t, b.x, b.y).forEach(([x, y]) => [[1, 0], [-1, 0], [0, 1], [0, -1]].forEach(([dx, dy]) => {
+        if (isRoad(x + dx, y + dy)) uni(N * N + i, (y + dy) * N + x + dx);
+      }));
+    }
+  });
+
+  const has = (b, k) => tiles(b.t, b.x, b.y).some(([x, y]) => MAP[y * N + x] == k);
+  const groups = {};
+  let people = 0, jobs = 0, water = 0, power = 0, demand = 0;
+
+  blds.forEach((b, i) => {
+    const d = B[b.t];
+    const grp = () => groups[f(N * N + i)] = groups[f(N * N + i)] || { people: 0, jobs: 0, w: [] };
+    if (d.cat == 'house') {
+      const v = d.v;
+      people += v; demand += d.v / 4;
+      grp().people += v;
+    } else if (d.cat == 'work') {
+      const m = 1;
+      jobs += d.v; demand += d.v / 4;
+      const g = grp();
+      g.jobs += d.v; g.w.push([d.v, m]);
+    } else if (d.cat == 'pump') {
+      water += d.v;
+    } else if (d.cat == 'power') {
+      power += d.v;
+    }
+  });
+
+  let income = 0;
+  Object.values(groups).forEach(g => {
+    const workers = Math.min(g.people, g.jobs);
+    g.w.forEach(([v, m]) => income += workers * (v / g.jobs) * 5 * m);
+  });
+  const eff = 1;
+  return { income: income * eff, people, jobs, water, power, demand };
 }
 
 // ---------- rysowanie ----------
@@ -114,7 +167,6 @@ function draw() {
     const k = MAP[y * N + x];
     pic(TN[k], x, y, 1, 1, TC[k]);
   }
-   //ai
   blds.forEach(b => {
     pic(b.t, b.x, b.y, B[b.t].w, B[b.t].h, B[b.t].col);
     ctx.strokeStyle = '#000';
@@ -126,7 +178,6 @@ function draw() {
       ctx.textBaseline = 'middle';
       ctx.fillText(LETTER[B[b.t].cat] + b.t.slice(-1), (b.x + B[b.t].w / 2) * S, (b.y + B[b.t].h / 2) * S);
     }
-    //koniec ai
   });
   if (hover && tool != 'bulldoze') {
     ctx.fillStyle = canPlace(tool, hover[0], hover[1]) ? 'rgba(0,255,0,.45)' : 'rgba(255,0,0,.45)';
@@ -135,13 +186,16 @@ function draw() {
 }
 
 function ui() {
-  document.getElementById('stats').innerHTML = `Pieniądze: <b>$${money}</b>`;
+  const s = calc();
+  document.getElementById('stats').innerHTML =
+    `Pieniądze: <b>$${money}</b><br>Przychód: +${Math.round(s.income)} / 3s<br>` +
+    `Ludzie: ${Math.round(s.people)} (prace: ${s.jobs})`;
   draw();
 }
 //ai
 // ---------- panel budynków ----------
 const tl = document.getElementById('tools');
-const heads = { road: 'Drogi', house: 'Domy', work: 'Praca ', pump: 'Woda', power: 'Prąd' };
+const heads = { road: 'Drogi', house: 'Domy', work: 'Praca', pump: 'Woda', power: 'Prąd' };
 const unit = { house: 'os.', work: 'prac.', pump: 'wody', power: 'prądu' };
 let lastCat = '';
 Object.keys(B).concat('bulldoze').forEach(t => {
@@ -184,10 +238,13 @@ cv.onclick = e => {
     if (i >= 0) blds.splice(i, 1);
   } else if (canPlace(tool, x, y)) {
     blds.push({ t: tool, x, y });
+    money -= B[tool].c;
   } else return;
   ui();
 };
 
+// ---------- start ----------
+setInterval(() => { money += Math.round(calc().income); ui(); }, 3000);
 ui();
 </script>
 </body>
