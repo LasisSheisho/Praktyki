@@ -212,7 +212,7 @@ function ui() {
 //ai
 // ---------- panel budynków ----------
 const tl = document.getElementById('tools');
-const heads = { road: 'Drogi', house: 'Domy (ludzie)', work: 'Praca (miejsca)', pump: 'Woda', power: 'Prąd' };
+const heads = { road: 'Drogi', house: 'Dom', work: 'Praca', pump: 'Woda', power: 'Prąd' };
 const unit = { house: 'os.', work: 'prac.', pump: 'wody', power: 'prądu' };
 let lastCat = '';
 Object.keys(B).concat('bulldoze').forEach(t => {
@@ -228,7 +228,7 @@ Object.keys(B).concat('bulldoze').forEach(t => {
   }
   const b = document.createElement('button');
   b.className = 'tool'; b.id = 't_' + t;
-  const name = t == 'bulldoze' ? 'Burz' : B[t].n;
+  const name = t == 'bulldoze' ? 'Usuń' : B[t].n;
   const info = t == 'bulldoze' ? '' : ` ${B[t].w}x${B[t].h} - $${B[t].c}` + (B[t].v ? ` - ${B[t].v} ${unit[B[t].cat]}` : '');
   const col = t == 'bulldoze' ? '#a33' : B[t].col;
   b.innerHTML = `<span style="width:18px;height:18px;flex:none;background:${col};border:1px solid #000"></span><span>${name}<br><small>${info}</small></span>`;
