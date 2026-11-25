@@ -10,14 +10,24 @@ mysqli_report(MYSQLI_REPORT_OFF);                 // błędy bazy zwracają fals
 
 // Połączenie z bazą MySQL (host, użytkownik, hasło, nazwa bazy)
 $db = new mysqli('localhost', 'root', '', 'citygrid');
+
+//$db->connect_error to pole tego obiektu. Gdy połączenie się udało, jest puste (null)
+//a gdy nie, zawiera tekst błędu, np. Connection refused. Dlatego if ($db->connect_error) znaczy "jeśli wystąpił błąd połączenia".
 // Jeśli nie ma połączenia lub brakuje tabeli, zwracamy czytelny błąd i kończymy
 if ($db->connect_error) { echo json_encode(['error' => 'Brak połączenia z bazą (' . $db->connect_error . '). Czy MySQL działa i zaimportowano database.sql?']); exit; }
+
+// $db to zmienna z połączeniem z bazą danych. W PHP każda zmienna zaczyna się od $
+//json_encode(...) zamienia tablicę PHP na tekst w formacie JSON, który JavaScript potrafi odczytać
 if (!$db->query('SELECT 1 FROM users LIMIT 1')) { echo json_encode(['error' => 'Brak tabeli users. Zaimportuj database.sql w phpMyAdmin.']); exit; }
+//$db->query(...) wysyła do bazy zapytanie SQL i zwraca wynik. Jeśli zapytanie się nie uda (np. tabela nie istnieje), zwraca false.
+
 
 // Dane wysłane z JavaScriptu (JSON w treści żądania) zamieniamy na tablicę
 $in = json_decode(file_get_contents('php://input'), true) ?: [];
 // Nazwa żądanej operacji, np. 'login'
 $action = $_GET['action'] ?? '';
+//?: (tzw. skrócony operator trójargumentowy, "elvis") znaczy: "weź to po lewej, a jeśli to jest "puste" (fałszywe), weź to po prawej"
+//?? (operator null coalescing) znaczy: "weź to po lewej, a jeśli tego nie ma (nie istnieje albo jest null),
 
 // Wysyła odpowiedź JSON i kończy działanie skryptu
 function out($d) { echo json_encode($d); exit; }
