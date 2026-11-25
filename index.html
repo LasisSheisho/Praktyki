@@ -4,52 +4,65 @@
 <meta charset="utf-8">
 <title>CityGrid</title>
 <style>
+  /* Ogólny wygląd strony: ciemne tło, biały tekst */
   body { margin: 0; font-family: Arial, sans-serif; background: #222; color: #fff; }
+  /* Górny pasek: pusta kolumna - tytuł na środku - panel logowania po prawej */
   #top { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; background: #111; padding: 8px 16px; }
   #top h1 { margin: 0; }
   #auth { text-align: right; }
   #auth input { width: 90px; }
+  /* Komunikat o błędzie (czerwony) pod polami logowania */
   #msg { color: #f88; font-size: 12px; height: 14px; }
+  /* Główny obszar: lewy panel, mapa i prawy panel obok siebie, wyśrodkowane */
   #main { display: flex; justify-content: center; gap: 12px; padding: 12px; }
   .panel { background: #333; padding: 10px; width: 220px; height: fit-content; }
   .panel h3 { margin: 0 0 8px; }
   .panel ol { padding-left: 20px; margin: 0; }
+  /* Mapa gry */
   canvas { background: #000; cursor: crosshair; display: block; flex: none; }
+  /* Przyciski wyboru budynków; .sel to aktualnie wybrany */
   .tool { display: flex; align-items: center; gap: 6px; width: 100%; margin-bottom: 4px; padding: 4px; cursor: pointer; text-align: left; }
   .tool img { width: 28px; height: 28px; }
   .tool.sel { background: #fc3; }
+  /* Statystyki i podpowiedzi pod listą budynków */
   #stats { margin-top: 10px; font-size: 14px; line-height: 1.6; }
   #info { font-size: 12px; color: #aaa; margin-top: 10px; }
 </style>
 </head>
 <body>
 
+<!-- Górny pasek z tytułem i logowaniem -->
 <div id="top">
   <div></div>
   <h1>CityGrid</h1>
   <div id="auth">
+    <!-- Widoczne, gdy nikt nie jest zalogowany -->
     <span id="guest">
       <input id="u" placeholder="Nick"> <input id="p" type="password" placeholder="Hasło">
       <button onclick="auth('login')">Zaloguj</button>
       <button onclick="auth('register')">Rejestracja</button>
     </span>
+    <!-- Widoczne po zalogowaniu: nick i przycisk wylogowania -->
     <span id="logged" hidden><b id="name"></b> <button onclick="logout()">Wyloguj</button></span>
     <div id="msg"></div>
   </div>
 </div>
 
 <div id="main">
+  <!-- Lewy panel: ranking graczy (wypełniany przez js/api.js) -->
   <div class="panel">
     <h3>Leaderboard</h3>
     <ol id="lb"></ol>
   </div>
 
+  <!-- Mapa gry (rysowana przez js/render.js) -->
   <canvas id="map"></canvas>
 
+  <!-- Prawy panel: lista budynków, statystyki i podpowiedzi -->
   <div class="panel">
     <h3>Budynki</h3>
-    <div id="tools"></div>
-    <div id="stats"></div>
+    <div id="tools"></div>   <!-- przyciski budynków dodaje js/toolbar.js -->
+    <div id="stats"></div>   <!-- statystyki wypełnia js/render.js -->
     <div id="info">
       Piasek: +10% wody.<br>
       Bagno: -10% ludzi / zarobków.<br>
@@ -58,259 +71,13 @@
   </div>
 </div>
 
-<script>
-const N = 32, S = 20;                       
-const TN = ['grass', 'darkgrass', 'swamp', 'water', 'sand'];
-const TC = ['#7c5', '#385', '#675', '#37a', '#ec8'];
-
-const TIERS = {
-  house: { col: '#c55', list: [['Dom', 1, 1, 100, 4], ['Dom wielorodzinny', 2, 2, 400, 20], ['Blok', 2, 3, 1500, 80], ['Wieżowiec', 3, 4, 6000, 400]] },
-  work:  { col: '#58c', list: [['Warsztat', 1, 1, 150, 4], ['Sklep', 2, 2, 500, 20], ['Fabryka', 3, 3, 2000, 80], ['Biurowiec', 3, 4, 8000, 400]] },
-  pump:  { col: '#4cf', list: [['Studnia', 1, 1, 100, 10], ['Pompa', 2, 1, 300, 40], ['Stacja wody', 2, 2, 1000, 150], ['Wodociągi', 3, 2, 4000, 600]] },
-  power: { col: '#fc3', list: [['Generator', 1, 1, 100, 10], ['Elektrownia', 2, 2, 300, 40], ['Elektr. gazowa', 2, 3, 1000, 150], ['Reaktor', 3, 3, 4000, 600]] }
-};
-const B = { road: { cat: 'road', n: 'Droga', w: 1, h: 1, c: 10, col: '#555' } };
-Object.keys(TIERS).forEach(cat => TIERS[cat].list.forEach((a, i) => {
-  B[cat + (i + 1)] = { cat, n: a[0], w: a[1], h: a[2], c: a[3], v: a[4], col: TIERS[cat].col };
-}));
-
-// ---------- stała mapa ----------
-//ai
-function terr(x, y) {
-  const d = (a, b, r) => (x - a) ** 2 + (y - b) ** 2 < r * r;
-  const wat = (a, b) => (a - 24) ** 2 / 36 + (b - 7) ** 2 / 16 < 1 || (a - 6) ** 2 + (b - 25) ** 2 < 9;
-  if (wat(x, y)) return 3;
-  let near = false;
-  for (let dy = -2; dy <= 2; dy++) for (let dx = -2; dx <= 2; dx++) if (wat(x + dx, y + dy)) near = true;
-  if (near && ((y >= 8 && x >= 18) || x <= 5)) return 4;   // piasek tylko na części brzegów
-  if (d(12, 12, 3) || d(26, 22, 3.5) || d(4, 8, 2.5)) return 2;
-  if (d(14, 22, 4) || d(10, 4, 3) || d(28, 28, 3)) return 1;
-  return 0;
-}
-const MAP = [];
-for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) MAP[y * N + x] = terr(x, y);
-//koniec ai
-// ---------- stan gry ----------
-let blds = [], money = 1000, tool = 'road', user = null, hover = null;
-const cv = document.getElementById('map');
-cv.width = cv.height = N * S;
-const ctx = cv.getContext('2d');
-
-const tiles = (t, x, y) => {
-  const r = [];
-  for (let j = 0; j < B[t].h; j++) for (let i = 0; i < B[t].w; i++) r.push([x + i, y + j]);
-  return r;
-};
-const inMap = (x, y) => x >= 0 && y >= 0 && x < N && y < N;
-
-function occ() {
-  const o = new Array(N * N).fill(-1);
-  blds.forEach((b, i) => tiles(b.t, b.x, b.y).forEach(([x, y]) => o[y * N + x] = i));
-  return o;
-}
-
-function canPlace(t, x, y) {
-  if (money < B[t].c) return false;
-  const o = occ(), ts = tiles(t, x, y);
-  for (const [a, b] of ts) {
-    if (!inMap(a, b) || MAP[b * N + a] == 3 || o[b * N + a] >= 0) return false;
-  }
-  if (B[t].cat == 'pump') {   // musi stać obok wody
-    return ts.some(([a, b]) => [[1, 0], [-1, 0], [0, 1], [0, -1]].some(([dx, dy]) =>
-      inMap(a + dx, b + dy) && MAP[(b + dy) * N + a + dx] == 3));
-  }
-  return true;
-}
-
-// ---------- obliczenia ----------
-function calc() {
-  const o = occ(), p = [...Array(N * N + blds.length).keys()];
-  const f = a => p[a] == a ? a : (p[a] = f(p[a]));
-  const uni = (a, b) => { p[f(a)] = f(b); };
-  const isRoad = (x, y) => inMap(x, y) && o[y * N + x] >= 0 && blds[o[y * N + x]].t == 'road';
-
-  blds.forEach((b, i) => {
-    if (b.t == 'road') {
-      [[1, 0], [0, 1]].forEach(([dx, dy]) => { if (isRoad(b.x + dx, b.y + dy)) uni(b.y * N + b.x, (b.y + dy) * N + b.x + dx); });
-    } else if (B[b.t].cat == 'house' || B[b.t].cat == 'work') {
-      tiles(b.t, b.x, b.y).forEach(([x, y]) => [[1, 0], [-1, 0], [0, 1], [0, -1]].forEach(([dx, dy]) => {
-        if (isRoad(x + dx, y + dy)) uni(N * N + i, (y + dy) * N + x + dx);
-      }));
-    }
-  });
-
-  const has = (b, k) => tiles(b.t, b.x, b.y).some(([x, y]) => MAP[y * N + x] == k);
-  const groups = {};
-  let people = 0, jobs = 0, water = 0, power = 0, demand = 0;
-
-  blds.forEach((b, i) => {
-    const d = B[b.t];
-    const grp = () => groups[f(N * N + i)] = groups[f(N * N + i)] || { people: 0, jobs: 0, w: [] };
-    if (d.cat == 'house') {
-      const v = d.v * (has(b, 2) ? 0.9 : 1);
-      people += v; demand += d.v / 4;
-      grp().people += v;
-    } else if (d.cat == 'work') {
-      const m = (has(b, 2) ? 0.9 : 1) * (has(b, 1) ? 1.1 : 1); 
-      jobs += d.v; demand += d.v / 4;
-      const g = grp();
-      g.jobs += d.v; g.w.push([d.v, m]);
-    } else if (d.cat == 'pump') {
-      water += d.v * (has(b, 4) ? 1.1 : 1);
-    } else if (d.cat == 'power') {
-      power += d.v;
-    }
-  });
-
-  let income = 0;
-  Object.values(groups).forEach(g => {
-    const workers = Math.min(g.people, g.jobs);
-    g.w.forEach(([v, m]) => income += workers * (v / g.jobs) * 5 * m);
-  });
-  const eff = demand ? Math.min(1, water / demand, power / demand) : 1;
-  return { income: income * eff, people, jobs, water, power, demand };
-}
-
-// ---------- rysowanie ----------
-function pic(n, x, y, w, h, col) {
-  ctx.fillStyle = col;
-  ctx.fillRect(x * S, y * S, w * S, h * S);
-}
-
-const LETTER = { house: 'D', work: 'P', pump: 'W', power: 'E' };
-
-function draw() {
-  for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
-    const k = MAP[y * N + x];
-    pic(TN[k], x, y, 1, 1, TC[k]);
-  }
-  blds.forEach(b => {
-    pic(b.t, b.x, b.y, B[b.t].w, B[b.t].h, B[b.t].col);
-    ctx.strokeStyle = '#000';
-    ctx.strokeRect(b.x * S, b.y * S, B[b.t].w * S, B[b.t].h * S);
-    if (B[b.t].cat != 'road') {
-      ctx.fillStyle = '#000';
-      ctx.font = 'bold 11px Arial';
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      ctx.fillText(LETTER[B[b.t].cat] + b.t.slice(-1), (b.x + B[b.t].w / 2) * S, (b.y + B[b.t].h / 2) * S);
-    }
-  });
-  if (hover && tool != 'bulldoze') {
-    ctx.fillStyle = canPlace(tool, hover[0], hover[1]) ? 'rgba(0,255,0,.45)' : 'rgba(255,0,0,.45)';
-    tiles(tool, hover[0], hover[1]).forEach(([x, y]) => ctx.fillRect(x * S, y * S, S, S));
-  }
-}
-
-function ui() {
-  const s = calc();
-  document.getElementById('stats').innerHTML =
-    `Pieniądze: <b>$${money}</b><br>Przychód: +${Math.round(s.income)} / 3s<br>` +
-    `Ludzie: ${Math.round(s.people)} (prace: ${s.jobs})<br>Woda: ${Math.round(s.water)} / ${Math.round(s.demand)}<br>Prąd: ${s.power} / ${Math.round(s.demand)}`;
-  draw();
-}
-//ai
-// ---------- panel budynków ----------
-const tl = document.getElementById('tools');
-const heads = { road: 'Drogi', house: 'Dom', work: 'Praca', pump: 'Woda', power: 'Prąd' };
-const unit = { house: 'os.', work: 'prac.', pump: 'wody', power: 'prądu' };
-let lastCat = '';
-Object.keys(B).concat('bulldoze').forEach(t => {
-  const cat = t == 'bulldoze' ? 'bulldoze' : B[t].cat;
-  if (cat != lastCat) {
-    lastCat = cat;
-    if (heads[cat]) {
-      const h = document.createElement('div');
-      h.textContent = heads[cat];
-      h.style.cssText = 'margin:8px 0 3px;color:#fc3;font-weight:bold';
-      tl.appendChild(h);
-    }
-  }
-  const b = document.createElement('button');
-  b.className = 'tool'; b.id = 't_' + t;
-  const name = t == 'bulldoze' ? 'Usuń' : B[t].n;
-  const info = t == 'bulldoze' ? '' : ` ${B[t].w}x${B[t].h} - $${B[t].c}` + (B[t].v ? ` - ${B[t].v} ${unit[B[t].cat]}` : '');
-  const col = t == 'bulldoze' ? '#a33' : B[t].col;
-  b.innerHTML = `<span style="width:18px;height:18px;flex:none;background:${col};border:1px solid #000"></span><span>${name}<br><small>${info}</small></span>`;
-  b.onclick = () => {
-    tool = t;
-    document.querySelectorAll('.tool').forEach(e => e.classList.remove('sel'));
-    b.classList.add('sel');
-  };
-  tl.appendChild(b);
-});
-document.getElementById('t_road').classList.add('sel');
-//koniec ai
-// ---------- mysz ----------
-const pos = e => {
-  const r = cv.getBoundingClientRect();
-  return [Math.floor((e.clientX - r.left) * cv.width / r.width / S), Math.floor((e.clientY - r.top) * cv.height / r.height / S)];
-};
-cv.onmousemove = e => { hover = pos(e); draw(); };
-cv.onmouseleave = () => { hover = null; draw(); };
-cv.onclick = e => {
-  const [x, y] = pos(e);
-  if (tool == 'bulldoze') {
-    const i = occ()[y * N + x];
-    if (i >= 0) blds.splice(i, 1);
-  } else if (canPlace(tool, x, y)) {
-    blds.push({ t: tool, x, y });
-    money -= B[tool].c;
-  } else return;
-  ui(); save();
-};
-
-// ---------- API / login ----------
-const api = (a, d) => fetch('api.php?action=' + a, { method: 'POST', body: JSON.stringify(d || {}) }).then(r => r.json());
-const msg = t => document.getElementById('msg').textContent = t || '';
-
-function setUser(r) {
-  user = r.username;
-  money = Number(r.money);
-  blds = JSON.parse(r.city || '[]').filter(b => B[b.t]);
-  document.getElementById('guest').hidden = true;
-  document.getElementById('logged').hidden = false;
-  document.getElementById('name').textContent = user;
-  msg(); ui();
-}
-
-function auth(a) {
-  api(a, { username: document.getElementById('u').value, password: document.getElementById('p').value })
-    .then(r => r.error ? msg(r.error) : (setUser(r), lb()));
-}
-
-function logout() {
-  save();
-  api('logout').then(() => {
-    user = null; money = 1000; blds = [];
-    document.getElementById('guest').hidden = false;
-    document.getElementById('logged').hidden = true;
-    ui();
-  });
-}
-
-function save() {
-  if (user) api('save', { money, city: JSON.stringify(blds) });
-}
-
-function lb() {
-  api('leaderboard').then(r => {
-    const ol = document.getElementById('lb');
-    ol.innerHTML = '';
-    (Array.isArray(r) ? r : []).forEach(u => {
-      const li = document.createElement('li');
-      li.textContent = `${u.username} - $${u.money}`;
-      ol.appendChild(li);
-    });
-  });
-}
-
-// ---------- start ----------
-setInterval(() => { money += Math.round(calc().income); ui(); save(); }, 3000);
-setInterval(lb, 5000);
-api('me').then(r => { if (r.username) setUser(r); });
-lb();
-ui();
-</script>
+<!-- Skrypty gry. Kolejność ma znaczenie: każdy plik korzysta z poprzednich -->
+<script src="js/config.js"></script>   <!-- stałe, budynki, mapa -->
+<script src="js/game.js"></script>     <!-- stan gry i logika -->
+<script src="js/render.js"></script>   <!-- rysowanie -->
+<script src="js/toolbar.js"></script>  <!-- panel budynków -->
+<script src="js/input.js"></script>    <!-- obsługa myszy -->
+<script src="js/api.js"></script>      <!-- komunikacja z api.php -->
+<script src="js/main.js"></script>     <!-- start gry -->
 </body>
 </html>
